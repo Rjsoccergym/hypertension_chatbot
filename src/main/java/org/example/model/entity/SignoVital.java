@@ -1,10 +1,10 @@
 package org.example.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.example.model.enums.EstadoSignoVital;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -14,6 +14,7 @@ import java.util.List;
 @Setter
 @Entity
 @Table(name = "SIGNO_VITAL")
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class SignoVital extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
@@ -39,10 +40,24 @@ public class SignoVital extends BaseEntity {
     private LocalDateTime fechaRegistro;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "paciente_id", nullable = false)
+    private Paciente paciente;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "medico_id", nullable = false)
     private Medico medico;
 
     @OneToMany(mappedBy = "signoVital", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Observacion> observaciones = new ArrayList<>();
+    private List<Observacion> observaciones;
+
+    public void addObservacion(Observacion observacion) {
+
+        if (this.observaciones == null) {
+            this.observaciones = new ArrayList<>();
+        }
+
+        this.observaciones.add(observacion);
+        observacion.setSignoVital(this);
+    }
 
 }

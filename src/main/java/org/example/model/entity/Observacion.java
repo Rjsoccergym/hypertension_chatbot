@@ -1,5 +1,6 @@
 package org.example.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import jakarta.persistence.Column;
@@ -14,10 +15,14 @@ import java.time.LocalDateTime;
 @Setter
 @Entity
 @Table(name = "OBSERVACION")
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class Observacion extends BaseEntity {
 
     @Column(columnDefinition = "TEXT", nullable = false)
     private String mensaje;
+
+    @Column(nullable = false)
+    private boolean leido = false;
 
     @Column(name = "fecha_registro")
     private LocalDateTime fechaRegistro;

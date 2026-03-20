@@ -7,10 +7,11 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface ObservacionesRepository extends JpaRepository<Observacion, Long> {
+public interface ObservacionRepository extends JpaRepository<Observacion, Long> {
 
-    List<Observacion> findByMessageContaining(String keyword);
+    List<Observacion> findByMensaje(String keyword);
 
     List<Observacion> findBySignoVitalId(Long signoVitalId);
 
+    List<Observacion> findBySignoVital_Paciente_IdAndLeidoFalse(Long pacienteId);
 }

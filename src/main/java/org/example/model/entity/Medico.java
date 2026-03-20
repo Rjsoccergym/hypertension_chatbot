@@ -1,5 +1,6 @@
 package org.example.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.persistence.Entity;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.PrimaryKeyJoinColumn;
@@ -17,6 +18,7 @@ import java.util.Set;
 @Entity
 @Table(name = "MEDICO")
 @PrimaryKeyJoinColumn(name = "persona_id")
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class Medico extends Persona {
 
     @ManyToMany

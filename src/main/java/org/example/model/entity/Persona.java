@@ -1,8 +1,8 @@
 package org.example.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.Inheritance;
 import jakarta.persistence.InheritanceType;
 import jakarta.persistence.Column;
@@ -22,8 +22,8 @@ import java.time.LocalDate;
 @Setter
 @Entity
 @Table(name = "PERSONA")
-@MappedSuperclass
 @Inheritance(strategy = InheritanceType.JOINED)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public abstract class Persona extends BaseEntity {
 
     @Column(nullable = false)
@@ -33,8 +33,7 @@ public abstract class Persona extends BaseEntity {
     private String apellido;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tipo_identificacion_id")
-    @Column(name = "tipo_identificacion")
+    @JoinColumn(name = "tipo_identificacion_id", nullable = false)
     private TipoIdentificacion tipoIdentificacion;
 
     @Column(name = "numero_identificacion", unique = true, nullable = false)

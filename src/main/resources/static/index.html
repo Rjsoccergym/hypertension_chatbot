@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hipertensión ChatBot v2 - Maestría</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --bot-bg: #f1f3f4; --user-bg: #007bff; --user-color: white; }
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
+        .chat-container { height: 500px; overflow-y: auto; padding: 20px; background: white; border-bottom: 1px solid #eee; }
+        .bubble { max-width: 85%; padding: 12px 16px; border-radius: 18px; margin-bottom: 12px; font-size: 0.95rem; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .bot { background: var(--bot-bg); align-self: flex-start; border-bottom-left-radius: 4px; color: #3c4043; }
+        .user { background: var(--user-bg); color: var(--user-color); align-self: flex-end; border-bottom-right-radius: 4px; margin-left: auto; }
+        .phone-frame { border: 12px solid #202124; border-radius: 40px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); background: #202124; }
+        .exit-note { font-size: 0.75rem; color: #6c757d; text-align: center; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-4 d-none d-lg-block">
+            <h6 class="text-uppercase text-muted">Monitor de Peticiones REST</h6>
+            <div id="api-logs" class="bg-dark text-info p-3 rounded" style="height: 580px; font-family: 'Courier New', monospace; font-size: 0.8rem; overflow-y: auto; border: 1px solid #333;">
+                [System] Esperando interacción...
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="phone-frame">
+                <div class="bg-dark text-white p-3 text-center border-bottom border-secondary">
+                    <span class="fw-bold">Hipertensión Bot 🤖</span>
+                </div>
+                <div id="chat-window" class="chat-container d-flex flex-column"></div>
+                <div class="bg-white p-3">
+                    <div class="input-group">
+                        <input type="text" id="user-input" class="form-control" placeholder="Escribe aquí...">
+                        <button class="btn btn-primary" onclick="handleUserInput()">Enviar</button>
+                    </div>
+                    <div class="exit-note">Escribe <b>"0"</b> o <b>"Salir"</b> para cancelar</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentState = "GREETING";
+    let userData = {};
+    let currentUser = null;
+    let selectedRole = ""; // 1: Paciente, 2: Médico
+
+    const chatWindow = document.getElementById('chat-window');
+    const inputField = document.getElementById('user-input');
+    const logArea = document.getElementById('api-logs');
+
+    function addMessage(text, side) {
+        const div = document.createElement('div');
+        div.className = `bubble ${side}`;
+        div.innerHTML = text.replace(/\n/g, '<br>');
+        chatWindow.appendChild(div);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    function addLog(method, url, body = "") {
+        const time = new Date().toLocaleTimeString();
+        logArea.innerHTML += `<div class="mb-2"><span class="text-warning">[${time}]</span> <span class="text-primary">${method}</span> ${url}<br><span class="text-secondary">${body}</span></div>`;
+        logArea.scrollTop = logArea.scrollHeight;
+    }
+
+    function startChat() {
+        currentState = "GREETING_ROLE";
+        userData = {};
+        currentUser = null;
+        chatWindow.innerHTML = '';
+        addMessage("¡Hola! Soy tu ChatBot de confianza. 👋", 'bot');
+        addMessage("Cuéntame, ¿cómo te identificas hoy?\n1. Paciente\n2. Médico\n\n(Envía 0 para salir)", 'bot');
+    }
+
+    function handleUserInput() {
+        const input = inputField.value.trim();
+        if (!input) return;
+        addMessage(input, 'user');
+        inputField.value = '';
+
+        if (input === "0" || input.toLowerCase() === "salir" || input.toLowerCase() === "inicio") {
+            addMessage("Operación cancelada. Volviendo al inicio...", 'bot');
+            setTimeout(startChat, 1000);
+            return;
+        }
+        processState(input);
+    }
+
+    async function processState(input) {
+        switch (currentState) {
+            case "GREETING_ROLE":
+                if (input === "1" || input === "2") {
+                    selectedRole = input === "1" ? "Paciente" : "Médico";
+                    currentState = "SELECT_ID_TYPE";
+                    addMessage(`Perfecto. Selecciona tu tipo de identificación:\n1. Cédula de Ciudadanía\n2. Tarjeta de Identidad\n3. Cédula de Extranjería\n4. Pasaporte\n\n(0 para salir)`, 'bot');
+                } else {
+                    addMessage("Opción no válida. Por favor envía 1 para Paciente o 2 para Médico.", 'bot');
+                }
+                break;
+
+            case "SELECT_ID_TYPE":
+                const types = {"1": "Cédula de Ciudadanía", "2": "Tarjeta de Identidad", "3": "Cédula de Extranjería", "4": "Pasaporte"};
+                if (types[input]) {
+                    userData.tipoId = input;
+                    userData.tipoIdLabel = types[input];
+                    currentState = "ENTER_ID_NUMBER";
+                    addMessage("Por favor, diligencia tu número de identificación:\n(0 para salir)", 'bot');
+                } else {
+                    addMessage("La opción enviada no es válida. Selecciona 1, 2, 3 o 4.", 'bot');
+                }
+                break;
+
+            case "ENTER_ID_NUMBER":
+                userData.numeroId = input;
+                verifyUserInDB(input);
+                break;
+
+            case "NOT_FOUND_OPTIONS":
+                if (input === "1") {
+                    currentState = "REG_NAME";
+                    addMessage("Iniciemos el registro. Por favor envíame tus Nombres:", 'bot');
+                } else if (input === "2") {
+                    currentState = "SELECT_ID_TYPE";
+                    addMessage(`Selecciona tu tipo de identificación:\n1. Cédula de Ciudadanía\n2. Tarjeta de Identidad...`, 'bot');
+                }
+                break;
+
+            case "REG_NAME":
+                userData.nombre = input;
+                currentState = "REG_SURNAME";
+                addMessage("Ahora tus Apellidos:", 'bot');
+                break;
+
+            case "REG_SURNAME":
+                userData.apellido = input;
+                // Aquí llamarías al POST real de tu API
+                addLog("POST", `/api/usuarios/${selectedRole.toLowerCase()}s`, JSON.stringify(userData));
+                addMessage(`¡Registro exitoso! Un gusto atenderte ${userData.nombre}.\n\n¿Qué deseas hacer?\n1. Registrar Signos Vitales\n2. Ver Historial\n(0 para salir)`, 'bot');
+                currentState = "MAIN_MENU";
+                break;
+
+            case "MAIN_MENU":
+                if (input === "1") {
+                    currentState = "INPUT_SIS";
+                    addMessage("Por favor envía la PRESIÓN SISTÓLICA (ej: 120):", 'bot');
+                } else if (input === "2") {
+                    addLog("GET", `/api/signos-vitales/paciente/${userData.numeroId}`);
+                    addMessage("Mostrando historial... (Simulado)\n07/03/2026: 120/80 mmHg - NORMAL", 'bot');
+                }
+                break;
+
+            case "INPUT_SIS":
+                userData.sis = input;
+                currentState = "INPUT_DIA";
+                addMessage("Envía la PRESIÓN DIASTÓLICA (ej: 80):", 'bot');
+                break;
+
+            case "INPUT_DIA":
+                userData.dia = input;
+                addLog("POST", "/api/signos-vitales", `SIS: ${userData.sis}, DIA: ${input}`);
+                addMessage("Información guardada satisfactoriamente. ✅\nEnvía 'Inicio' para empezar de nuevo.", 'bot');
+                currentState = "FINISHED";
+                break;
+        }
+    }
+
+    async function verifyUserInDB(id) {
+    const tipoId = userData.tipoId;
+    addLog("GET", `/api/usuarios/verificar?tipoId=${tipoId}&numeroId=${id}`);
+
+    try {
+        const response = await fetch(`/api/usuarios/verificar?tipoId=${tipoId}&numeroId=${id}`);
+
+        if (response.ok) {
+            // CASO: EL USUARIO SÍ EXISTE
+            currentUser = await response.json();
+            addMessage(`¡Bienvenido de nuevo, ${currentUser.nombre}! Un gusto atenderte hoy. 👋`, 'bot');
+            addMessage(`¿En qué puedo ayudarte?\n1. Registrar Signos Vitales\n2. Modificar Signos\n3. Eliminar Signos\n4. Ver Historial (con Observaciones)\n\n(0 para salir)`, 'bot');
+            currentState = "MAIN_MENU";
+        } else {
+            // CASO: EL USUARIO NO EXISTE (404)
+            addMessage(`No se ha encontrado ningún ${selectedRole} con el Tipo de Identificación "${userData.tipoIdLabel}" y Número "${id}".`, 'bot');
+            addMessage(`Desea:\n1. Crear nuevo ${selectedRole}\n2. Volver a diligenciar información\n\n(0 para salir)`, 'bot');
+            currentState = "NOT_FOUND_OPTIONS";
+        }
+    } catch (error) {
+        addLog("ERROR", "No se pudo conectar con el servidor");
+        addMessage("Lo siento, tuve un problema al conectar con mi base de datos. Intenta más tarde.", 'bot');
+    }
+}
+
+    startChat();
+</script>
+</body>
+</html>

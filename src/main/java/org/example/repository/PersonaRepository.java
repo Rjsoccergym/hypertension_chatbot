@@ -1,14 +1,14 @@
 package org.example.repository;
 
+import org.example.model.entity.Persona;
 import org.example.model.entity.TipoIdentificacion;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
-
 import java.util.Optional;
 
 @Repository
-public interface TipoIdentificacionRepository extends JpaRepository<TipoIdentificacion, Long> {
+public interface PersonaRepository extends JpaRepository<Persona, Long> {
 
-    Optional<TipoIdentificacion> findByCodigo(String codigo);
+    Optional<Persona> findByTipoIdentificacion_IdAndNumeroIdentificacion(Long tipoId, String numeroId);
 
 }
