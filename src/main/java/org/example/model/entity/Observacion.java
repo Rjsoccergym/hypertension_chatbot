@@ -1,6 +1,7 @@
 package org.example.model.entity;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import jakarta.persistence.Column;
@@ -29,6 +30,12 @@ public class Observacion extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "signo_vital_id", nullable = false)
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private SignoVital signoVital;
+
+    @JsonProperty("signoVitalId")
+    public Long getSignoVitalId() {
+        return signoVital != null ? signoVital.getId() : null;
+    }
 
 }

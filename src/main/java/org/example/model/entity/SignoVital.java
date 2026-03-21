@@ -1,6 +1,7 @@
 package org.example.model.entity;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -58,6 +59,11 @@ public class SignoVital extends BaseEntity {
 
         this.observaciones.add(observacion);
         observacion.setSignoVital(this);
+    }
+
+    @JsonProperty("pacienteId")
+    public Long getPacienteId() {
+        return paciente != null ? paciente.getId() : null;
     }
 
 }

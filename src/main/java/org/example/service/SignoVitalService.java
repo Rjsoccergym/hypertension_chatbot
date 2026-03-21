@@ -5,8 +5,12 @@ import org.example.model.entity.SignoVital;
 import org.example.model.enums.EstadoSignoVital;
 import org.example.repository.PacienteRepository;
 import org.example.repository.SignoVitalRepository;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -32,7 +36,13 @@ public class SignoVitalService {
     // Consulta la lista de signos vitales asociados al Usuario
     @Transactional(readOnly = true)
     public List<SignoVital> obtenerHistorialPaciente(Long pacienteId) {
-        return signoVitalRepository.findByPacienteIdOrderByFechaRegistroDesc(pacienteId);
+        return signoVitalRepository.findByPaciente_IdOrderByCreatedAtDesc(pacienteId);
+    }
+
+    // Muestra TODOS los Signos Vitales registrados en el Sistema
+    @Transactional(readOnly = true)
+    public List<SignoVital> obtenerAllHistorial() {
+        return signoVitalRepository.findAll();
     }
 
     // Borra el último registro, en caso de error en el registro

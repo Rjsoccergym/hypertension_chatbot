@@ -118,10 +118,12 @@ async function processState(input) {
                     "Por favor, diligencia tu número de identificación:",
                     "bot",
                 );
-            } else {addMessage(
+            } else {
+                addMessage(
                     "Opción no válida. Selecciona 1, 2, 3 o 4.",
                     "bot",
-                );}
+                );
+            }
             break;
 
         case "ENTER_ID_NUMBER":
@@ -214,7 +216,7 @@ async function processState(input) {
                         "bot",
                     );
                 } else if (input === "2") {
-                    await verMiHistorialPaciente(); // Solo sus datos
+                    await verMiHistorialPaciente();
                 } else {
                     addMessage(
                         "Opción no válida para tu perfil de Paciente.",
@@ -223,7 +225,7 @@ async function processState(input) {
                 }
             } else if (selectedRole === "Médico") {
                 if (input === "1") {
-                    await listarPacientesDelMedico(); // Solo los que tiene asignados
+                    await listarPacientesDelMedico();
                 } else if (input === "2") {
                     currentState = "SELECT_SIGNOS_ID";
                     addMessage(
@@ -232,6 +234,14 @@ async function processState(input) {
                     );
                 }
             }
+            break;
+
+        case "SELECT_SIGNOS_ID":
+            await iniciarFlujoObservacion(input);
+            break;
+
+        case "WAITING_OBSERVATION_TEXT":
+            await guardarObservacionFinal(input);
             break;
 
         case "INPUT_SIS":
@@ -336,6 +346,130 @@ function mostrarMenuPrincipal() {
     currentState = "MAIN_MENU";
 }
 
+async function listarPacientesDelMedico() {
+    // La URL que definiste es correcta para traer los pacientes vinculados al médico logueado
+    const url = `/api/medicos/${currentUser.id}/pacientes`;
+    addLog("GET", url);
+    addMessage("Consultando tu lista de pacientes asignados... 📋", "bot");
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Error al obtener pacientes");
+
+        const pacientes = await response.json();
+
+        if (!pacientes || pacientes.length === 0) {
+            addMessage(
+                "Actualmente no tienes pacientes vinculados a tu registro médico. 👤",
+                "bot",
+            );
+            addMessage(
+                "Para vincular uno, el paciente debe ingresar tu ID al momento de su registro.\n\n¿Deseas volver al menú?\n0. Sí",
+                "bot",
+            );
+            currentState = "MAIN_MENU";
+        } else {
+            addMessage(
+                `Doctor, he encontrado **${pacientes.length}** pacientes bajo su supervisión:`,
+                "bot",
+            );
+
+            pacientes.forEach((p, index) => {
+                // Formateamos la información clínica del paciente
+                const rhSimbolo = p.rh === "POSITIVO" ? "+" : "-";
+                const infoSangre = p.grupoSanguineo ? `${p.grupoSanguineo}${rhSimbolo}` : "No registrado";
+
+                let msg = `👤 **Paciente #${index + 1}**\n` +
+                    `• **Nombre:** ${p.nombre} ${p.apellido}\n` +
+                    `• **ID Sistema:** ${p.id}\n` +
+                    `• **Documento:** ${p.numeroIdentificacion}\n` +
+                    `• **Sexo:** ${p.sexo || 'N/A'}\n` +
+                    `• **G.S / RH:** ${infoSangre}`;
+
+                addMessage(msg, "bot");
+            });
+
+            addMessage(
+                "¿Qué desea realizar ahora?\n2. Agregar Observación Médica ✍️\n3. Ver Alertas de Presión ⚠️\n0. Salir",
+                "bot",
+            );
+            currentState = "MAIN_MENU";
+        }
+    } catch (e) {
+        console.error(e);
+        addMessage("Lo siento Doctor, hubo un fallo al cargar la lista de pacientes. Reintente en un momento. 😕", "bot");
+    }
+}
+
+/**
+ * PASO 1: El médico ingresa el ID del Signo Vital (viene del MAIN_MENU)
+ */
+async function iniciarFlujoObservacion(signoId) {
+    userData.currentSignoId = signoId;
+    const urlVerificar = `/api/observaciones/historial/${signoId}`;
+
+    addLog("GET", urlVerificar);
+
+    try {
+        const response = await fetch(urlVerificar);
+
+        if (response.ok) {
+            const signo = await response.json();
+
+            // Lógica de seguridad: Si no hay objeto paciente (por el LAZY), usamos el ID
+            const infoPaciente = (signo.paciente && signo.paciente.nombre)
+                ? `${signo.paciente.nombre} ${signo.paciente.apellido}`
+                : `Paciente del Registro #${signoId}`;
+
+            addMessage(`✅ **Signo Localizado**\n` +
+                `👤 Corresponde a: ${infoPaciente}\n` +
+                `🩺 Presión: ${signo.presionSistolica}/${signo.presionDiastolica} mmHg\n\n` +
+                `¿Qué instrucción médica desea registrar?`, "bot");
+
+            currentState = "WAITING_OBSERVATION_TEXT";
+        } else {
+            addMessage(`❌ El ID **${signoId}** no existe en los registros actuales.`, "bot");
+            mostrarMenuPrincipal();
+        }
+    } catch (e) {
+        console.error("Error en el mapeo LAZY:", e);
+        addMessage("⚠️ Error: El servidor no envió los detalles del paciente. Verifica que la relación no esté siendo ignorada por Jackson.", "bot");
+    }
+}
+
+/**
+ * PASO 2: Se envía la observación final al API
+ */
+async function guardarObservacionFinal(textoMensaje) {
+    // Endpoint basado en tu estructura: /api/observaciones/responder/{signoId}
+    const url = `/api/observaciones/responder/${userData.currentSignoId}`;
+
+    // El cuerpo debe ser el objeto Observacion que espera tu Entidad
+    const body = {
+        mensaje: textoMensaje
+    };
+
+    addLog("POST", url, JSON.stringify(body));
+
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        if (res.ok) {
+            addMessage("✅ Observación guardada correctamente. El paciente ya puede verla en su historial.", "bot");
+            await refreshDataTables(); // Refrescamos la pestaña de Observaciones
+            mostrarMenuPrincipal();
+        } else {
+            addMessage("No se pudo guardar la observación. Intente de nuevo.", "bot");
+        }
+    } catch (error) {
+        addMessage("Error de conexión al guardar la observación.", "bot");
+    }
+}
+
 async function ejecutarPostRegistro() {
     const isPaciente = selectedRole === "Paciente";
     const endpoint = isPaciente
@@ -367,6 +501,7 @@ async function ejecutarPostRegistro() {
         currentUser = await res.json();
         addMessage(`¡Registro exitoso!`, "bot");
         await refreshDataTables();
+        mostrarMenuPrincipal();
         currentState = "MAIN_MENU";
     }
 }
@@ -382,8 +517,8 @@ async function guardarSignosVitales() {
         saturacionOxigeno: userData.sat ? parseInt(userData.sat) : null,
     };
 
-    addLog("POST", "/api/signos-vitales", JSON.stringify(body));
-    const res = await fetch("/api/signos-vitales", {
+    addLog("POST", "/api/signos-vitales/registrar", JSON.stringify(body));
+    const res = await fetch("/api/signos-vitales/registrar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -391,10 +526,11 @@ async function guardarSignosVitales() {
 
     if (res.ok) {
         addMessage(
-            "Información guardada satisfactoriamente. ✅\nEnvía 'Inicio' para volver a empezar.",
+            "Información guardada satisfactoriamente. ✅\n",
             "bot",
         );
-        currentState = "FINISHED";
+        currentState = "MAIN_MENU";
+        mostrarMenuPrincipal();
     }
 }
 
@@ -428,9 +564,8 @@ async function verHistorialConObservaciones() {
                     `• Pulso: ${s.frecuenciaCardiaca} BPM`;
 
                 if (s.observaciones && s.observaciones.length > 0) {
-                    msg += `\n\n👨‍⚕️ **Nota Médica:** "${
-                        s.observaciones[0].mensaje
-                    }"`;
+                    msg += `\n\n👨‍⚕️ **Nota Médica:** "${s.observaciones[0].mensaje
+                        }"`;
                 }
                 addMessage(msg, "bot");
             });
@@ -446,59 +581,61 @@ async function verHistorialConObservaciones() {
 
 // Función para obtener y renderizar los datos en las tablas
 async function refreshDataTables() {
-    if (selectedRole === "Paciente") {
-        document.getElementById("table-pacientes-body").innerHTML =
-            "<tr><td colspan='4' class='text-center text-muted'>Acceso restringido: Solo vista personal en el Chat</td></tr>";
-        document.getElementById("table-medicos-body").innerHTML = "";
-        return;
-    }
-
     try {
         // --- CARGAR PACIENTES ---
         const resPacientes = await fetch("/api/usuarios/pacientes");
         const pacientes = await resPacientes.json();
-        const pBody = document.getElementById("table-pacientes-body");
-
-        pBody.innerHTML = pacientes.map((p) => {
-            // Lógica para extraer el ID del médico (maneja objeto o ID directo)
-            let medicoMostrar = "No asignado";
-            if (p.medico) {
-                medicoMostrar = p.medico.id || p.medico;
-            } else if (p.medicoId) {
-                medicoMostrar = p.medicoId;
-            }
-
-            return `
+        document.getElementById("table-pacientes-body").innerHTML = pacientes.map(p => `
             <tr>
                 <td>${p.id}</td>
-                <td><span class="fw-bold">${p.nombre} ${p.apellido}</span></td>
+                <td><small>${p.nombre} ${p.apellido}</small></td>
                 <td>${p.numeroIdentificacion}</td>
-                <td><span class="badge bg-info text-dark">${
-                p.sexo || "N/A"
-            }</span></td>
-                <td>${p.grupoSanguineo || ""}${
-                p.rh === "POSITIVO" ? "+" : "-"
-            }</td>
-                <td class="text-center">
-                    <span class="badge bg-primary">DR. ID: ${medicoMostrar}</span>
-                </td>
-            </tr>`;
-        }).join("");
+                <td>${p.sexo || 'N/A'}</td>
+                <td>${p.grupoSanguineo || ''}${p.rh === 'POSITIVO' ? '+' : '-'}</td>
+                <td><span class="badge bg-primary">ID: ${p.medico?.id || p.medicoId || 'N/A'}</span></td>
+            </tr>`).join("");
 
         // --- CARGAR MÉDICOS ---
         const resMedicos = await fetch("/api/usuarios/medicos");
         const medicos = await resMedicos.json();
-        const mBody = document.getElementById("table-medicos-body");
-
-        mBody.innerHTML = medicos.map((m) => `
+        document.getElementById("table-medicos-body").innerHTML = medicos.map(m => `
             <tr>
                 <td>${m.id}</td>
-                <td>${m.nombre} ${m.apellido}</td>
-                <td>${m.sexo || "N/A"}</td>
-                <td><span class="badge bg-secondary">${m.registroMedico}</span></td>
-                <td>${m.especialidad || "General"}</td>
-            </tr>
-        `).join("");
+                <td>${m.nombre}</td>
+                <td>${m.numeroIdentificacion}</td>
+                <td>${m.sexo || 'N/A'}</td>
+                <td>${m.registroMedico}</td>
+                <td>${m.especialidad || 'General'}</td>
+            </tr>`).join("");
+
+        // --- CARGAR SIGNOS VITALES ---
+        const resSignos = await fetch("/api/signos-vitales/historial");
+        const signos = await resSignos.json();
+        document.getElementById("table-signos-body").innerHTML = signos.map(s => {
+            const estado = calcularEstado(s.presionSistolica, s.presionDiastolica);
+            const colorEstado = estado.includes("ALTA") ? "danger" : (estado.includes("PRE") ? "warning" : "success");
+            return `
+            <tr>
+                <td>${s.id}</td>
+                <td>${s.paciente?.id || s.pacienteId || 'N/A'}</td>
+                <td><b>${s.presionSistolica}/${s.presionDiastolica}</b></td>
+                <td>${s.frecuenciaCardiaca}</td>
+                <td>${s.temperatura || '-'}/${s.saturacionOxigeno || '-'}</td>
+                <td><span class="badge bg-${colorEstado}">${estado}</span></td>
+            </tr>`;
+        }).join("");
+
+        // --- CARGAR OBSERVACIONES ---
+        const resObs = await fetch("/api/observaciones/historial");
+        const observaciones = await resObs.json();
+        document.getElementById("table-obs-body").innerHTML = observaciones.map(o => `
+            <tr>
+                <td>${o.id}</td>
+                <td>${o.signoVital?.id || o.signoVitalId || 'N/A'}</td>
+                <td title="${JSON.stringify(o.mensaje)}"><small>${o.mensaje.substring(0, 20)}...</small></td>
+                <td><small>${new Date(o.createdAt).toLocaleDateString()}</small></td>
+            </tr>`).join("");
+
     } catch (error) {
         console.error("Error cargando tablas:", error);
     }
@@ -518,7 +655,7 @@ async function verMiHistorialPaciente() {
         if (misSignos.length === 0) {
             addMessage("Aún no tienes registros de signos vitales. 🩺", "bot");
             addMessage(
-                "Es importante iniciar tu monitoreo. ¿Deseas registrar tu presión ahora?\n1. Sí, registrar\n0. Volver",
+                "Es importante iniciar tu monitoreo. ¿Deseas registrar tu presión ahora?\n1. Sí, registrar\n0. Salir",
                 "bot",
             );
             return;
@@ -542,9 +679,8 @@ async function verMiHistorialPaciente() {
 
             // Verificamos si el médico dejó observaciones (Punto 13.1.2)
             if (s.observaciones && s.observaciones.length > 0) {
-                msg += `\n\n👨‍⚕️ **Observación Médica:**\n"${
-                    s.observaciones[0].mensaje
-                }"`;
+                msg += `\n\n👨‍⚕️ **Observación Médica:**\n"${s.observaciones[0].mensaje
+                    }"`;
             } else {
                 msg += `\n\nℹ️ *Sin observaciones médicas aún.*`;
             }
@@ -558,7 +694,7 @@ async function verMiHistorialPaciente() {
         );
     } catch (error) {
         addMessage(
-            "Lo siento, no tienes registros previos.",
+            "Lo siento, error al consultar los registros en el sistema.",
             "bot",
         );
     }

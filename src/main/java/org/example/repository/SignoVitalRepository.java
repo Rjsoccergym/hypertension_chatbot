@@ -8,7 +8,7 @@ import java.util.List;
 @Repository
 public interface SignoVitalRepository extends JpaRepository<SignoVital, Long> {
 
-    List<SignoVital> findByPacienteIdOrderByFechaRegistroDesc(Long pacienteId);
+    List<SignoVital> findByPaciente_IdOrderByCreatedAtDesc(Long id);
 
     List<SignoVital> findByMedicoId(Long medicoId);
 
