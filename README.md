@@ -84,7 +84,7 @@ El sistema implementa una arquitectura desacoplada donde el Frontend gestiona la
 ---
 
 ## 👥 Contribuciones
-Proyecto desarrollado como parte del módulo de **Procesos de Desarrollo de Software** para la Maestría en Ingeniería.
+Proyecto desarrollado como parte del módulo de **Procesos de Desarrollo de Software** para la Maestría en Gestión y Desarrollo de Proyectos de Software.
 
 **Autor:** @Rjsoccergym, @Jeronimo90-eng
 
