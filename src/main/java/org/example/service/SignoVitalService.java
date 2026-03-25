@@ -60,7 +60,7 @@ public class SignoVitalService {
     // Evalua inicialmente el estado del Signo Vital
     private EstadoSignoVital evaluarEstadoHipertension(int sis, int dia) {
         if (sis >= 140 || dia >= 90) return EstadoSignoVital.CRITICO;
-        if (sis >= 130 || dia >= 80) return EstadoSignoVital.ELEVADO;
+        if (sis >= 130 || dia > 80) return EstadoSignoVital.ELEVADO;
         return EstadoSignoVital.NORMAL;
     }
 
