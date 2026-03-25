@@ -12,7 +12,7 @@ import java.time.Period;
 @Service
 @RequiredArgsConstructor
 public class UsuarioService {
-
+    
     private final MedicoRepository medicoRepository;
     private final PacienteRepository pacienteRepository;
 
