@@ -3,7 +3,6 @@ package org.example.controller;
 import lombok.RequiredArgsConstructor;
 import org.example.model.entity.Medico;
 import org.example.model.entity.Paciente;
-import org.example.model.entity.TipoIdentificacion;
 import org.example.repository.MedicoRepository;
 import org.example.repository.PacienteRepository;
 import org.example.repository.PersonaRepository;
