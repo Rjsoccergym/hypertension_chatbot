@@ -45,6 +45,12 @@ public class SignoVitalService {
         return signoVitalRepository.findAll();
     }
 
+    // Muestra TODOS los Signos Vitales registrados en el Sistema con las Observaciones
+    @Transactional(readOnly = true)
+    public List<SignoVital> obtenerAllHistorialWithObservaciones(Long pacienteId) {
+        return signoVitalRepository.findByPacienteIdWithObservaciones(pacienteId);
+    }
+
     // Borra el último registro, en caso de error en el registro
     @Transactional
     public void eliminarRegistroIncongruente(Long id) {

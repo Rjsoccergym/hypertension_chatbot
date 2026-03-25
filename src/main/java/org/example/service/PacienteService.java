@@ -7,9 +7,11 @@ import org.example.model.entity.Paciente;
 import org.example.model.entity.TipoIdentificacion;
 import org.example.repository.MedicoRepository;
 import org.example.repository.TipoIdentificacionRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.example.repository.PacienteRepository;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -32,8 +34,12 @@ public class PacienteService {
         Paciente nuevo = new Paciente();
         nuevo.setNombre(nombre);
         nuevo.setApellido(apellido);
-        nuevo.setNumeroIdentificacion(identificacion);
         nuevo.setTipoIdentificacion(tipo);
+
+        if (nuevo.getTipoIdentificacion().getId() == 1 && nuevo.getEdad() < 18) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debe ser mayor de edad para usar Cédula.");
+        }
+        nuevo.setNumeroIdentificacion(identificacion);
         nuevo.setMedico(medico);
 
         return pacienteRepository.save(nuevo);

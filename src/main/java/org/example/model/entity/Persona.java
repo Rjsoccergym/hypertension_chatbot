@@ -1,6 +1,6 @@
 package org.example.model.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Entity;
@@ -19,6 +19,7 @@ import org.example.model.enums.GrupoSanguineo;
 import org.example.model.enums.RH;
 import org.example.model.enums.Sexo;
 import java.time.LocalDate;
+import java.time.Period;
 
 @Getter
 @Setter
@@ -33,6 +34,9 @@ public abstract class Persona extends BaseEntity {
 
     @Column(nullable = false)
     private String apellido;
+
+    @Column(name = "edad", nullable = true)
+    private Integer edad;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tipo_identificacion_id", nullable = false)
@@ -55,6 +59,7 @@ public abstract class Persona extends BaseEntity {
     private String direccion;
 
     @Column(name = "fecha_nacimiento")
+    @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate fechaNacimiento;
 
     @Enumerated(EnumType.STRING)
@@ -66,5 +71,11 @@ public abstract class Persona extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     private RH rh;
+
+    @JsonProperty("edad")
+    public int getEdad() {
+        if (fechaNacimiento == null) return 0;
+        return Period.between(fechaNacimiento, LocalDate.now()).getYears();
+    }
 
 }

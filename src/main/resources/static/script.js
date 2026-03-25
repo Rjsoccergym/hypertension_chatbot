@@ -12,6 +12,7 @@ function resetUserData() {
     userData = {
         tipoIdentificacion: { id: null },
         numeroIdentificacion: "",
+        fechaNacimiento: "",
         nombre: "",
         apellido: "",
         sexo: "",
@@ -82,7 +83,6 @@ function mostrarMenuPrincipal() {
         menu = `Bienvenido Dr. **${currentUser.apellido}**:\n` +
             `1. Listar mis Pacientes Asignados 👥\n` +
             `2. Agregar Observación a un Registro ✍️\n` +
-            `3. Ver Alertas de Presión Arterial ⚠️\n` +
             `0. Salir`;
     }
 
@@ -149,11 +149,28 @@ async function processState(input) {
 
         case "REG_SURNAME":
             userData.apellido = input;
-            currentState = "REG_SEXO";
-            addMessage(
-                "Selecciona tu Sexo:\n1. MASCULINO\n2. FEMENINO\n3. OTRO",
-                "bot",
-            );
+            currentState = "REG_BIRTHDATE";
+            addMessage("Por favor envíame tu Fecha de Nacimiento (AAAA-MM-DD):", "bot");
+            break;
+
+        case "REG_BIRTHDATE":
+            const edadCalculada = calcularEdad(input);
+            
+            if (edadCalculada < 0 || edadCalculada > 120 || isNaN(edadCalculada)) {
+                addMessage("⚠️ La fecha ingresada no es válida. Usa el formato AAAA-MM-DD (Ej: 1990-05-20).", "bot");
+            } else if (userData.tipoIdentificacion.id === 1 && edadCalculada < 18) { 
+                // Validación de Cédula de Ciudadanía (ID 1)
+                addMessage(`🚫 No puedes registrarte con Cédula si tienes ${edadCalculada} años. Debes ser mayor de edad.`, "bot");
+                addMessage("Volviendo al inicio del registro...", "bot");
+                setTimeout(startChat, 2000);
+            } else {
+                userData.fechaNacimiento = input; // Guardamos la fecha
+                currentState = "REG_SEXO";
+                addMessage(
+                    "Selecciona tu Sexo:\n1. MASCULINO\n2. FEMENINO\n3. OTRO",
+                    "bot",
+                );
+            }
             break;
 
         case "REG_SEXO":
@@ -338,7 +355,6 @@ function mostrarMenuPrincipal() {
         menu = `Bienvenido Dr. **${currentUser.apellido}**:\n` +
             `1. Listar mis Pacientes Asignados 👥\n` +
             `2. Agregar Observación a un Registro ✍️\n` +
-            `3. Ver Alertas de Presión Arterial ⚠️\n` +
             `0. Salir`;
     }
 
@@ -377,27 +393,32 @@ async function listarPacientesDelMedico() {
             pacientes.forEach((p, index) => {
                 // Formateamos la información clínica del paciente
                 const rhSimbolo = p.rh === "POSITIVO" ? "+" : "-";
-                const infoSangre = p.grupoSanguineo ? `${p.grupoSanguineo}${rhSimbolo}` : "No registrado";
+                const infoSangre = p.grupoSanguineo
+                    ? `${p.grupoSanguineo}${rhSimbolo}`
+                    : "No registrado";
 
                 let msg = `👤 **Paciente #${index + 1}**\n` +
                     `• **Nombre:** ${p.nombre} ${p.apellido}\n` +
                     `• **ID Sistema:** ${p.id}\n` +
                     `• **Documento:** ${p.numeroIdentificacion}\n` +
-                    `• **Sexo:** ${p.sexo || 'N/A'}\n` +
+                    `• **Sexo:** ${p.sexo || "N/A"}\n` +
                     `• **G.S / RH:** ${infoSangre}`;
 
                 addMessage(msg, "bot");
             });
 
             addMessage(
-                "¿Qué desea realizar ahora?\n2. Agregar Observación Médica ✍️\n3. Ver Alertas de Presión ⚠️\n0. Salir",
+                "¿Qué desea realizar ahora?\n2. Agregar Observación Médica ✍️\n\n0. Salir",
                 "bot",
             );
             currentState = "MAIN_MENU";
         }
     } catch (e) {
         console.error(e);
-        addMessage("Lo siento Doctor, hubo un fallo al cargar la lista de pacientes. Reintente en un momento. 😕", "bot");
+        addMessage(
+            "Lo siento Doctor, hubo un fallo al cargar la lista de pacientes. Reintente en un momento. 😕",
+            "bot",
+        );
     }
 }
 
@@ -421,19 +442,28 @@ async function iniciarFlujoObservacion(signoId) {
                 ? `${signo.paciente.nombre} ${signo.paciente.apellido}`
                 : `Paciente del Registro #${signoId}`;
 
-            addMessage(`✅ **Signo Localizado**\n` +
-                `👤 Corresponde a: ${infoPaciente}\n` +
-                `🩺 Presión: ${signo.presionSistolica}/${signo.presionDiastolica} mmHg\n\n` +
-                `¿Qué instrucción médica desea registrar?`, "bot");
+            addMessage(
+                `✅ **Signo Localizado**\n` +
+                    `👤 Corresponde a: ${infoPaciente}\n` +
+                    `🩺 Presión: ${signo.presionSistolica}/${signo.presionDiastolica} mmHg\n\n` +
+                    `¿Qué instrucción médica desea registrar?`,
+                "bot",
+            );
 
             currentState = "WAITING_OBSERVATION_TEXT";
         } else {
-            addMessage(`❌ El ID **${signoId}** no existe en los registros actuales.`, "bot");
+            addMessage(
+                `❌ El ID **${signoId}** no existe en los registros actuales.`,
+                "bot",
+            );
             mostrarMenuPrincipal();
         }
     } catch (e) {
         console.error("Error en el mapeo LAZY:", e);
-        addMessage("⚠️ Error: El servidor no envió los detalles del paciente. Verifica que la relación no esté siendo ignorada por Jackson.", "bot");
+        addMessage(
+            "⚠️ Error: El servidor no envió los detalles del paciente. Verifica que la relación no esté siendo ignorada por Jackson.",
+            "bot",
+        );
     }
 }
 
@@ -446,24 +476,30 @@ async function guardarObservacionFinal(textoMensaje) {
 
     // El cuerpo debe ser el objeto Observacion que espera tu Entidad
     const body = {
-        mensaje: textoMensaje
+        mensaje: textoMensaje,
     };
 
     addLog("POST", url, JSON.stringify(body));
 
     try {
         const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
         });
 
         if (res.ok) {
-            addMessage("✅ Observación guardada correctamente. El paciente ya puede verla en su historial.", "bot");
+            addMessage(
+                "✅ Observación guardada correctamente. El paciente ya puede verla en su historial.",
+                "bot",
+            );
             await refreshDataTables(); // Refrescamos la pestaña de Observaciones
             mostrarMenuPrincipal();
         } else {
-            addMessage("No se pudo guardar la observación. Intente de nuevo.", "bot");
+            addMessage(
+                "No se pudo guardar la observación. Intente de nuevo.",
+                "bot",
+            );
         }
     } catch (error) {
         addMessage("Error de conexión al guardar la observación.", "bot");
@@ -479,6 +515,7 @@ async function ejecutarPostRegistro() {
     const body = {
         nombre: userData.nombre,
         apellido: userData.apellido,
+        fechaNacimiento: userData.fechaNacimiento,
         numeroIdentificacion: userData.numeroIdentificacion,
         tipoIdentificacion: { id: parseInt(userData.tipoIdentificacion.id) },
         sexo: userData.sexo,
@@ -564,8 +601,9 @@ async function verHistorialConObservaciones() {
                     `• Pulso: ${s.frecuenciaCardiaca} BPM`;
 
                 if (s.observaciones && s.observaciones.length > 0) {
-                    msg += `\n\n👨‍⚕️ **Nota Médica:** "${s.observaciones[0].mensaje
-                        }"`;
+                    msg += `\n\n👨‍⚕️ **Nota Médica:** "${
+                        s.observaciones[0].mensaje
+                    }"`;
                 }
                 addMessage(msg, "bot");
             });
@@ -585,57 +623,76 @@ async function refreshDataTables() {
         // --- CARGAR PACIENTES ---
         const resPacientes = await fetch("/api/usuarios/pacientes");
         const pacientes = await resPacientes.json();
-        document.getElementById("table-pacientes-body").innerHTML = pacientes.map(p => `
+        document.getElementById("table-pacientes-body").innerHTML = pacientes
+            .map((p) => `
             <tr>
                 <td>${p.id}</td>
                 <td><small>${p.nombre} ${p.apellido}</small></td>
                 <td>${p.numeroIdentificacion}</td>
-                <td>${p.sexo || 'N/A'}</td>
-                <td>${p.grupoSanguineo || ''}${p.rh === 'POSITIVO' ? '+' : '-'}</td>
-                <td><span class="badge bg-primary">ID: ${p.medico?.id || p.medicoId || 'N/A'}</span></td>
+                <td>${p.sexo || "N/A"}</td>
+                <td>${p.grupoSanguineo || ""}${
+                p.rh === "POSITIVO" ? "+" : "-"
+            }</td>
+                <td><span class="badge bg-primary">ID: ${
+                p.medico?.id || p.medicoId || "N/A"
+            }</span></td>
             </tr>`).join("");
 
         // --- CARGAR MÉDICOS ---
         const resMedicos = await fetch("/api/usuarios/medicos");
         const medicos = await resMedicos.json();
-        document.getElementById("table-medicos-body").innerHTML = medicos.map(m => `
+        document.getElementById("table-medicos-body").innerHTML = medicos.map(
+            (m) => `
             <tr>
                 <td>${m.id}</td>
                 <td>${m.nombre}</td>
                 <td>${m.numeroIdentificacion}</td>
-                <td>${m.sexo || 'N/A'}</td>
+                <td>${m.sexo || "N/A"}</td>
                 <td>${m.registroMedico}</td>
-                <td>${m.especialidad || 'General'}</td>
-            </tr>`).join("");
+                <td>${m.especialidad || "General"}</td>
+            </tr>`,
+        ).join("");
 
         // --- CARGAR SIGNOS VITALES ---
         const resSignos = await fetch("/api/signos-vitales/historial");
         const signos = await resSignos.json();
-        document.getElementById("table-signos-body").innerHTML = signos.map(s => {
-            const estado = calcularEstado(s.presionSistolica, s.presionDiastolica);
-            const colorEstado = estado.includes("ALTA") ? "danger" : (estado.includes("PRE") ? "warning" : "success");
-            return `
+        document.getElementById("table-signos-body").innerHTML = signos.map(
+            (s) => {
+                const estado = calcularEstado(
+                    s.presionSistolica,
+                    s.presionDiastolica,
+                );
+                const colorEstado = estado.includes("ALTA")
+                    ? "danger"
+                    : (estado.includes("PRE") ? "warning" : "success");
+                return `
             <tr>
                 <td>${s.id}</td>
-                <td>${s.paciente?.id || s.pacienteId || 'N/A'}</td>
+                <td>${s.paciente?.id || s.pacienteId || "N/A"}</td>
                 <td><b>${s.presionSistolica}/${s.presionDiastolica}</b></td>
                 <td>${s.frecuenciaCardiaca}</td>
-                <td>${s.temperatura || '-'}/${s.saturacionOxigeno || '-'}</td>
+                <td>${s.temperatura || "-"}/${s.saturacionOxigeno || "-"}</td>
                 <td><span class="badge bg-${colorEstado}">${estado}</span></td>
             </tr>`;
-        }).join("");
+            },
+        ).join("");
 
         // --- CARGAR OBSERVACIONES ---
         const resObs = await fetch("/api/observaciones/historial");
         const observaciones = await resObs.json();
-        document.getElementById("table-obs-body").innerHTML = observaciones.map(o => `
+        document.getElementById("table-obs-body").innerHTML = observaciones.map(
+            (o) => `
             <tr>
                 <td>${o.id}</td>
-                <td>${o.signoVital?.id || o.signoVitalId || 'N/A'}</td>
-                <td title="${JSON.stringify(o.mensaje)}"><small>${o.mensaje.substring(0, 20)}...</small></td>
-                <td><small>${new Date(o.createdAt).toLocaleDateString()}</small></td>
-            </tr>`).join("");
-
+                <td>${o.signoVital?.id || o.signoVitalId || "N/A"}</td>
+                <td title="${JSON.stringify(o.mensaje)}"><small>${
+                o.mensaje.substring(0, 20)
+            }...</small></td>
+                <td><small>${
+                new Date(o.createdAt).toLocaleDateString()
+            }</small></td>
+            </tr>`,
+        ).join("");
     } catch (error) {
         console.error("Error cargando tablas:", error);
     }
@@ -643,7 +700,8 @@ async function refreshDataTables() {
 
 async function verMiHistorialPaciente() {
     // Usamos el ID del usuario que se logueó (currentUser.id)
-    const url = `/api/signos-vitales/historial/${currentUser.id}`;
+    const url =
+        `/api/signos-vitales/historialConObservaciones/${currentUser.id}`;
     addLog("GET", url);
 
     try {
@@ -677,10 +735,29 @@ async function verMiHistorialPaciente() {
                 `• Presión: ${s.presionSistolica}/${s.presionDiastolica} mmHg (${estadoPresion})\n` +
                 `• Pulso: ${s.frecuenciaCardiaca} BPM`;
 
-            // Verificamos si el médico dejó observaciones (Punto 13.1.2)
+            // Verificamos si hay observaciones
             if (s.observaciones && s.observaciones.length > 0) {
-                msg += `\n\n👨‍⚕️ **Observación Médica:**\n"${s.observaciones[0].mensaje
-                    }"`;
+                msg +=
+                    `\n\n👨‍⚕️ **Observaciones Médicas (${s.observaciones.length}):**`;
+
+                // Recorremos TODAS las observaciones del arreglo
+                s.observaciones.forEach((obs, i) => {
+                    let textoLimpio = obs.mensaje;
+
+                    // Limpieza por si acaso se guardó como JSON String
+                    try {
+                        if (
+                            typeof textoLimpio === "string" &&
+                            textoLimpio.startsWith("{")
+                        ) {
+                            const parsed = JSON.parse(textoLimpio);
+                            textoLimpio = parsed.mensaje || textoLimpio;
+                        }
+                    } catch (e) { /* Texto plano, no hacemos nada */ }
+
+                    // Añadimos cada nota con un pequeño guion o número
+                    msg += `\n  ${i + 1}. "${textoLimpio}"`;
+                });
             } else {
                 msg += `\n\nℹ️ *Sin observaciones médicas aún.*`;
             }
@@ -705,6 +782,20 @@ function calcularEstado(sis, dia) {
     if (sis < 120 && dia < 80) return "NORMAL ✅";
     if (sis >= 140 || dia >= 90) return "ALTA (HIPERTENSIÓN) ⚠️";
     return "PREHIPERTENSIÓN 🟡";
+}
+
+function calcularEdad(fechaString) {
+    const hoy = new Date();
+    const fechaNac = new Date(fechaString);
+    if (isNaN(fechaNac.getTime())) return NaN;
+
+    let edad = hoy.getFullYear() - fechaNac.getFullYear();
+    const mes = hoy.getMonth() - fechaNac.getMonth();
+
+    if (mes < 0 || (mes === 0 && hoy.getDate() < fechaNac.getDate())) {
+        edad--;
+    }
+    return edad;
 }
 
 startChat();

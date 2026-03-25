@@ -26,6 +26,12 @@ public class SignoVitalController {
         return ResponseEntity.ok(signoVitalService.obtenerHistorialPaciente(pacienteId));
     }
 
+    // Muestra el historial de los Signos Vitales por Usuario con las Observaciones
+    @GetMapping("/historialConObservaciones/{pacienteId}")
+    public ResponseEntity<List<SignoVital>> consultarHistorialPorPacienteConObservaciones(@PathVariable Long pacienteId) {
+        return ResponseEntity.ok(signoVitalService.obtenerAllHistorialWithObservaciones(pacienteId));
+    }
+
     // Muestra todos los Signos Vitales Registrados
     @GetMapping("/historial")
     public ResponseEntity<List<SignoVital>> consultarAllHistorial() {
